@@ -286,6 +286,7 @@ send_email() {
             <p><strong>Backup Duration:</strong> ${BACKUP_DURATIONS[$i]}</p>
             <p>Start: ${BACKUP_STARTS[$i]}</p>
             <p>End: ${BACKUP_ENDS[$i]}</p>
+            <p><strong>Backup Test Status:</strong> ${TEST_STATUSES[$i]}</p>
             <p><strong>Decryption Password:</strong> <span class='highlight'>${BACKUP_PASSWORDS[$i]}</span></p>
             <p><strong>$command_label</strong></p>
             <pre class='command'>$decrypt_command</pre>
