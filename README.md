@@ -97,3 +97,19 @@ SMTP_PORT="587"
 SMTP_FROM="youraddress@icloud.com"  # Your iCloud email address
 SMTP_USER="youraddress@icloud.com"  # Your Apple ID (iCloud email address)
 SMTP_PASSWORD="app-specific-password"  # The app-specific password generated from iCloud*
+
+```
+
+# Changelog
+
+### Added
+- 20240909 : Added backup test status to the email report.
+
+
+### Changed
+- Updated email report styling with improved HTML/CSS formatting.
+
+## [1.0.0] - 2024-09-08
+
+### Added
+- Initial release of the backup script.
