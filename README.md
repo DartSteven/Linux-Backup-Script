@@ -1,20 +1,18 @@
-# Backup Script for Multiple Directories
 
-This script automates the process of backing up multiple directories, compressing them, and sending a detailed report via email. It also supports encryption of backup files with AES-256, email notifications, and Docker service management.
+# Backup Script for Multiple Directories and Databases
+
+This script automates the process of backing up multiple directories and databases, compressing them, and sending a detailed report via email. It supports encryption, email notifications, Docker service management, and database backups.
 
 ## Features
 
-- **Multiple Directories**: You can specify multiple directories to back up.
+- **Multiple Directories and Databases**: You can specify multiple directories and Docker-based databases to back up.
 - **Exclusion of Directories**: Option to exclude certain directories from the backup process.
-- **Compression and Encryption**: Backups are compressed using `pigz` and can be optionally encrypted with AES-256.
+- **Compression and Optional Encryption**: Backups are compressed using `pigz`, and encryption with AES-256 can be enabled or disabled.
 - **Email Reports**: Sends a detailed report after each backup operation, including backup size, MD5 checksum, and disk write speed.
-- **Docker Management**: Option to stop Docker services before backup and restart them after the process.
-- **Customizable**: Fully customizable with variables for backup names, source directories, email settings, and retention policies.
-
-
-![Sample](https://github.com/DartSteven/Backup/blob/main/Sample.png)
-
-
+- **Docker Management**: The script can stop Docker services before the backup and restart them afterward.
+- **Database Backup**: Supports the backup of PostgreSQL, Redis, and other Docker-managed databases.
+- **Customizable**: Fully customizable with variables for backup names, source directories, email settings, database backup options, and retention policies.
+- **Backup to Multiple Destinations**: Option to back up files to two separate SATA disks for redundancy (1,2,3 principle).
 
 ## Prerequisites
 
@@ -24,7 +22,8 @@ Before running the script, ensure that the following packages are installed on y
 - `pv`
 - `pigz`
 - `openssl`
-- `msmtp` (for sending email reports)
+- `msmtp`
+- `coreutils`
 
 The script will automatically check and install these packages if they are not available on your system.
 
@@ -34,82 +33,82 @@ The script includes several variables that can be customized:
 
 - **Backup name**: `BACKUP_NAME` – Defines the name of the backup.
 - **Server name**: `SERVER_NAME` – Name of the server to include in the email report.
-- **Encryption**: `ENCRYPT_BACKUP` – Set to `Y` to enable encryption of backup files.
+- **Encryption**: `ENCRYPT_BACKUP` – Set to `Y` to enable encryption of backup files, or `N` to disable it.
 - **Source directories**: `SOURCE_DIRS` – List of directories to include in the backup.
 - **Exclude directories**: `EXCLUDE_DIRS` – List of directories to exclude from the backup.
 - **Backup directory**: `BACKUP_DIR` – Where the backups will be saved.
 - **Email settings**: Set the recipient, SMTP host, port, and credentials for sending the backup report via email.
+- **Database backup**: `BACKUP_DOCKER_DATABASE` – Set to `Y` to enable Docker database backups.
+- **Database list**: `DATABASES` – Define which databases to back up, including container name, database name, and credentials.
 - **Backup retention**: `DAYS_TO_KEEP` – Number of days to keep old backups.
+- **Backup destinations**: `BACKUP_123` – Set to `Y` to enable backup to additional disks.
+- **Max CPU cores**: `MAX_CPU_CORE` – Set the number of CPU cores to use for compression.
 
-Example  
+Example
 An example of the source and excluded directories setup:
 
-    SOURCE_DIRS=(
+```bash
+SOURCE_DIRS=(
         "/home/JohnDoe"
         "/etc"
-    )
- 
+)
+
     EXCLUDE_DIRS=(
         "/home/JohnDoe/Personal"
-    )
+)
 
-## **Automate with cron**:
+DATABASES=(
+    "PostgreSQL|Joplin-Postgress|joplindb|joplin|unzpow3r"
+    "Redis|immich_redis||"
+)
+```
+
+## **Automate with cron**
 
 You can automate the backup process by adding it to your crontab. For example, to run the backup every day at midnight:
 
-    0 0 * * * /path/to/backup.sh
-
+```bash
+0 0 * * * /path/to/backup.sh
+```
 
 ## Usage
 
-1. **Modify the variables**: Edit the script to set the directories to back up, email settings, and other configuration options.
-2. **Run the script**: Make sure you are running the script as root or with `sudo`: sudo ./backup.sh
+1. **Modify the variables**: Edit the script to set the directories and databases to back up, email settings, and other configuration options.
+2. **Run the script**: Make sure you are running the script as root or with `sudo`: 
+   ```bash
+   sudo ./backup.sh
+   ```
 
+## iCloud Users: Configure Email Notifications
 
+To configure the script to send email notifications using iCloud's SMTP server:
 
-<br>
-<br>
+1. **Generate an App-Specific Password for iCloud**:
+   - Go to [appleid.apple.com](https://appleid.apple.com) and generate a password for third-party apps.
 
+2. **Update the Script** with iCloud SMTP settings:
+   ```bash
+   EMAIL_RECIPIENT="youraddress@icloud.com"
+   SMTP_HOST="smtp.mail.me.com"
+   SMTP_PORT="587"
+   SMTP_FROM="youraddress@icloud.com"
+   SMTP_USER="youraddress@icloud.com"
+   SMTP_PASSWORD="app-specific-password"
+   ```
 
+## Changelog
 
+### [2.0] - 2024-09-16
+#### Added
+- Added Docker-managed database backup functionality for PostgreSQL, Redis, and other databases.
+- Added option to back up to multiple SATA disks for redundancy (1,2,3 principle).
+- Introduced the ability to limit the number of CPU cores for compression.
+- Added functionality to select different email templates.
 
-## Attention to iCloud users : Configure Email Notifications with iCloud
+#### Changed
+- Updated backup source directories to `/media/nvme/1TB/ORI1` and `/media/nvme/1TB/ORI2`.
+- Updated the encryption option to be disabled by default.
 
-To configure the script to send email notifications using iCloud's SMTP server, follow these steps:
-
-### 1. Generate an App-Specific Password for iCloud
-
-iCloud requires an **app-specific password** for third-party applications (like this script) to send emails. Here's how you can generate one:
-
-1. Go to [appleid.apple.com](https://appleid.apple.com) and sign in with your Apple ID.
-2. In the **Security** section, look for **App-Specific Passwords** and click **Generate Password**.
-3. Enter a label for the password (e.g., "Backup Script") and click **Create**.
-4. Copy the password that is generated.
-
-### 2. Update the Script with iCloud SMTP Settings
-
-Edit the script and update the following SMTP variables to configure iCloud email notifications:
-
-```bash
-EMAIL_RECIPIENT="youraddress@icloud.com"  # The address that will receive the report
-SMTP_HOST="smtp.mail.me.com"
-SMTP_PORT="587"
-SMTP_FROM="youraddress@icloud.com"  # Your iCloud email address
-SMTP_USER="youraddress@icloud.com"  # Your Apple ID (iCloud email address)
-SMTP_PASSWORD="app-specific-password"  # The app-specific password generated from iCloud*
-
-```
-
-# Changelog
-
-### Added
-- 20240909 : Added backup test status to the email report.
-
-
-### Changed
-- Updated email report styling with improved HTML/CSS formatting.
-
-## [1.0.0] - 2024-09-08
-
-### Added
+### [1.0.0] - 2024-09-08
+#### Added
 - Initial release of the backup script.
