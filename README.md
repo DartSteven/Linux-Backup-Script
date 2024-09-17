@@ -102,7 +102,7 @@ SOURCE_DIRS=(
 )
 
 DATABASES=(
-    "PostgreSQL|Joplin-Postgress|joplindb|joplin|unzpow3r"
+    "PostgreSQL|Joplin-Postgress|joplindb|joplin|password"
     "Redis|immich_redis||"
 )
 ```
