@@ -12,18 +12,68 @@ This script automates the process of backing up multiple directories and databas
 - **Docker Management**: The script can stop Docker services before the backup and restart them afterward.
 - **Database Backup**: Supports the backup of PostgreSQL, Redis, and other Docker-managed databases.
 - **Customizable**: Fully customizable with variables for backup names, source directories, email settings, database backup options, and retention policies.
-- **Backup to Multiple Destinations**: Option to back up files to two separate SATA disks for redundancy (1,2,3 principle).
+- **Backup to Multiple Destinations**: Option to back up files to two separate SATA disks for redundancy (1,2,3 principle), Samba and SCP!.
+
+
+
+## Theme Comparison: Dark vs Light
+
+<div style="text-align: center;">
+  <table>
+    <tr>
+      <td align="center"><strong>Dark Theme</strong></td>
+      <td align="center"><strong>Light Theme</strong></td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Samlple%20Dark%20Theme%20-%20small%20-%20Directory.png" alt="Samlple Dark Theme - small - Directory" width="300"/>
+        <br>Directory
+      </td>
+      <td align="center">
+        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Sample%20Light%20Theme%20-%20small%20-%20Directory.png" alt="Sample Light Theme - Directory" width="300"/>
+        <br>Directory
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Samlple%20Dark%20Theme%20-%20small%20-%20Database.png" alt="Samlple Dark Theme - small - Database" width="300"/>
+        <br>Database
+      </td>
+      <td align="center">
+        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Sample%20Light%20Theme%20-%20small%20-%20Database.png" alt="Sample Light Theme - Database" width="300"/>
+        <br>Database
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Samlple%20Dark%20Theme%20-%20small%20-%20Statistics.png" alt="Samlple Dark Theme - small - Statistics" width="300"/>
+        <br>Statistics
+      </td>
+      <td align="center">
+        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Sample%20Light%20Theme%20-%20small%20-%20Statistics.png" alt="Sample Light Theme - Statistics" width="300"/>
+        <br>Statistics
+      </td>
+    </tr>
+  </table>
+</div>
+
 
 ## Prerequisites
 
 Before running the script, ensure that the following packages are installed on your Linux system:
 
 - `tar`
-- `pv`
+- `bar`
 - `pigz`
 - `openssl`
 - `msmtp`
 - `coreutils`
+- `cifs-utils`
+- `openssh-client`
+- `sshpass`
+- `smbclient`
+
+
 
 The script will automatically check and install these packages if they are not available on your system.
 
@@ -56,9 +106,13 @@ SOURCE_DIRS=(
     EXCLUDE_DIRS=(
         "/home/JohnDoe/Personal"
 )
+```
 
+An example of database backup setup:
+
+```bash
 DATABASES=(
-    "PostgreSQL|Joplin-Postgress|joplindb|joplin|unzpow3r"
+    "PostgreSQL|Joplin-Postgress|joplindb|joplin|password"
     "Redis|immich_redis||"
 )
 ```
@@ -98,15 +152,22 @@ To configure the script to send email notifications using iCloud's SMTP server:
 
 ## Changelog
 
+### [2.1] - 2024-09-26
+#### Added
+
+- Removed pv and introduce to bar
+- The script now supports the `BACKUP_123` feature, which enables backup redundancy by copying backups to different locations such as Samba shares and remote servers via SCP.
+- Added 10 different email templates.
+- The updated script includes enhancements for handling Docker containers and backing up databases, with improved consistency and performance.
+
 ### [2.0] - 2024-09-16
 #### Added
 - Added Docker-managed database backup functionality for PostgreSQL, Redis, and other databases.
 - Added option to back up to multiple SATA disks for redundancy (1,2,3 principle).
 - Introduced the ability to limit the number of CPU cores for compression.
-- Added functionality to select different email templates.
+- Added functionality to select different email templates (10).
 
 #### Changed
-- Updated backup source directories to `/media/nvme/1TB/ORI1` and `/media/nvme/1TB/ORI2`.
 - Updated the encryption option to be disabled by default.
 
 ### [1.0.0] - 2024-09-08

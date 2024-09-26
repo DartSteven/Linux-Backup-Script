@@ -55,9 +55,10 @@ ENCRYPT_BACKUP="Y"
 #	•	Example: SOURCE_DIRS=( "/home/JohnDoe" "/etc" )
 #	•	You can add multiple directories by separating each path with a space. Make sure each path points to valid directories you want to back up.
 SOURCE_DIRS=(
-        "/home/JohnDoe"
-        "/etc"
+    "/home/JohnDoe"
+    "/etc"
 )
+
 
 # Default variables for exlude directories
 #   •	This is an array of directories you want to exclude from the backup.
@@ -93,6 +94,7 @@ SMTP_FROM=""
 SMTP_USER=""
 SMTP_PASSWORD=""
 
+
 # Variable to define how many days to retain backups, Change the number of days as needed
 # 	•	This defines how many days to retain the backup files before they are automatically deleted.
 #	•	Example: DAYS_TO_KEEP=6
@@ -126,19 +128,41 @@ BACKUP_DATABASE_DIR=""
 #   •	Make sure to replace the example values with the actual values for your databases.
 #   •	You can leave this array empty if you do not want to back up any databases.
 #   •	Supportoed databases: PostgreSQL, TimescaleDB, MySQL, MariaDB, MongoDB, Redis, Cassandra, Elasticsearch, SQLite, Neo4j,
-#  •	                       CockroachDB, InfluxDB, Oracle, RethinkDB and Memcached.
+#   •	                       CockroachDB, InfluxDB, Oracle, RethinkDB and Memcached.
+#
+##   •	Example:
+#     "PostgreSQL|Postgress-Container|postgress-db|postgress-login|postgress-pass"
+#     "TimescaleDB|Timescale-Container|timescaledb|timescaleuser|timescalepass"
+#     "MySQL|MySQLContainer|mydatabase|dbuser|password2"
+#     "MariaDB|MariaDBContainer|mariadb|mariauser|mariapass"
+#     "MongoDB|MongoContainer|mydb|mongouser|password3"
+#     "Redis|RedisContainer|myredisdb|redisuser|password4"
+#     "Cassandra|CassandraContainer|cassandradb|cassandrauser|cassandrapass"
+#     "Elasticsearch|ElasticContainer|elasticdb|elasticuser|elasticpass"
+#     "SQLite|SQLiteContainer|sqlitedb|sqliteuser|sqlitepass"
+#     "Neo4j|Neo4jContainer|neo4jdb|neo4juser|neo4jpass"
+#     "CockroachDB|CockroachContainer|cockroachdb|roachuser|roachpass"
+#     "InfluxDB|InfluxContainer|influxdb|influxuser|influxpass"
+#     "Oracle|OracleContainer|oracledb|oracleuser|oraclepass"
+#     "RethinkDB|RethinkDBContainer|rethinkdb|rethinkuser|rethinkpass"
+#     "Memcached|MemcachedContainer|memcacheddb|memcacheduser|memcachedpass"
+#
 DATABASES=(
-        "PostgreSQL|Joplin-Postgress|joplindb|joplin|joplin"
-        "PostgreSQL|Tesla-Postgres|teslamate|teslamate|teslamate"
-        "PostgreSQL|immich_postgres|immich|postgres|postgres"
-        "Redis|immich_redis||"
-        "PostgreSQL|Invidiuous-db|invidious|kemal|kemal"
+    "PostgreSQL|Joplin-Postgress|joplindb|joplin|joplin"
+    "PostgreSQL|Tesla-Postgres|teslamate|teslamate|teslamate"
+    "PostgreSQL|immich_postgres|immich|postgres|postgres"
+    "Redis|immich_redis||"
+    "PostgreSQL|Invidiuous-db|invidious|kemal|kemal"
+
 )
 
 # Variable for selecting the email template
 # 	•	This variable allows you to choose between different email templates.
-#	•	Values: 1 for Professional Light Theme, 2 for Professional Dark, or random for a random selection.
-MAIL_TEMPLATE="1"
+#	•	Values: "random" or
+#	•	        "1" Dark Theme - "2" Crimson Night - "3" Cyberpunk - "4" Steel Gray - "5" Emerald Glow
+#	•	        "6" Home Lab Tech - "7" Light - "8" Midnight Blue - "9" Purple Dusk - "10" Retro Neon
+
+MAIL_TEMPLATE="random"
 
 # Variable to specify the maximum number of CPU cores to use for compression
 #   •	The variable MAX_CPU_CORE allows you to define how many CPU cores should be used for compression during the backup process.
@@ -156,6 +180,22 @@ MAX_CPU_CORE=20
 BACKUP_123="Y"
 SATA_DISK1=""
 SATA_DISK2=""
+
+# SCP Configuration Variables
+SCP_ENABLED="Y"  # Set to "Y" to enable SCP backup
+SCP_USER=""
+SCP_USER_PASSWORD=""
+SCP_HOST="" #IP Host
+SCP_DEST_DIR=""
+
+# SMB Configuration Variables
+SMB_ENABLED="Y"  # Set to "Y" to enable SMB backup
+SMB_USER=""
+SMB_PASSWORD=""
+SMB_REMOTE_SERVER="" #IP Host
+SMB_REMOTE_MOUNTPOINT=""
+SMB_REMOTE_BACKUP=""
+SMB_MOUNT_POINT=""
 
 
 
@@ -186,24 +226,29 @@ check_and_install_dependencies() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         DISTRO=$ID
-        echo "Distro found $DISTRO"
+        echo "Distro found: $DISTRO"
+        echo
     elif [ -f /etc/lsb-release ]; then
         . /etc/lsb-release
         DISTRO=$DISTRIB_ID
-        echo "Distro found $DISTRO"
+        echo "Distro found: $DISTRO"
+        echo
     elif [ -f /etc/debian_version ]; then
         DISTRO="debian"
-        echo "Distro found $DISTRO"
+        echo "Distro found: $DISTRO"
+        echo
     elif [ -f /etc/redhat-release ]; then
         DISTRO="rhel"
-        echo "Distro found $DISTRO"
+        echo "Distro found: $DISTRO"
+        echo
     else
         DISTRO=$(uname -s)
-        echo "Distro found $DISTRO"
+        echo "Distro found: $DISTRO"
+        echo
     fi
 
     # Required packages
-    REQUIRED_PACKAGES="tar pv pigz openssl msmtp coreutils"
+    REQUIRED_PACKAGES="tar bar pigz openssl msmtp coreutils cifs-utils openssh-client sshpass smbclient"
 
     case "$DISTRO" in
         ubuntu|debian)
@@ -252,6 +297,7 @@ check_and_install_dependencies() {
             ;;
     esac
 }
+
 
 check_and_install_dependencies
 
@@ -308,6 +354,12 @@ DATABASE_TEST_STATUSES=()
 # Array to store generated passwords
 BACKUP_PASSWORDS=()
 
+# Check if SOURCE_DIRS is not empty
+if [ ${#SOURCE_DIRS[@]} -eq 0 ]; then
+    echo "Error: No source directories specified for backup." >&2
+    exit 1
+fi
+
 # Check if the backup directory does not exist
 if [ ! -d "$BACKUP_DIR" ]; then
   # Create the backup directory
@@ -325,12 +377,84 @@ check_and_create_directories() {
     local dirs=("$@")
     for dir in "${dirs[@]}"; do
         if [ ! -d "$dir" ]; then
+            echo
             echo "Directory $dir does not exist. Creating it..."
             mkdir -p "$dir"
         else
+            echo
             echo "Directory $dir already exists."
+            echo
         fi
     done
+}
+
+# Function to check and create remote directory via SCP
+check_and_create_scp_directory() {
+    sshpass -p "$SCP_USER_PASSWORD" ssh "$SCP_USER@$SCP_HOST" "mkdir -p $SCP_DEST_DIR"
+}
+
+# Function to check and create remote directory via SMB
+check_and_create_smb_directory() {
+    # Mount the SMB share
+    mount_smb_share
+
+    # Construct the full path for the remote backup directory
+    FULL_REMOTE_PATH="${SMB_MOUNT_POINT}/${SMB_REMOTE_BACKUP}"
+
+    # Check if the remote backup directory exists
+    if [ ! -d "$FULL_REMOTE_PATH" ]; then
+        echo "Directory $FULL_REMOTE_PATH does not exist. Creating it..."
+        mkdir -p "$FULL_REMOTE_PATH"
+        if [ $? -eq 0 ]; then
+            echo "Directory created successfully."
+        else
+            echo "Failed to create directory."
+            exit 1
+        fi
+    else
+        echo "Directory $FULL_REMOTE_PATH already exists."
+    fi
+}
+
+# Function to mount SMB share
+mount_smb_share() {
+    # Check if the mount point exists, otherwise create it
+    if [ ! -d "$SMB_MOUNT_POINT" ]; then
+        echo "Creating local mount point at $SMB_MOUNT_POINT"
+        mkdir -p "$SMB_MOUNT_POINT"
+    fi
+
+    # Check if the SMB share is already mounted
+    if mount | grep "$SMB_MOUNT_POINT" > /dev/null; then
+        echo "SMB share already mounted at $SMB_MOUNT_POINT"
+    else
+        echo "Mounting SMB share //${SMB_REMOTE_SERVER}${SMB_REMOTE_MOUNTPOINT} at $SMB_MOUNT_POINT"
+        mount -t cifs -o username="$SMB_USER",password="$SMB_PASSWORD" "//${SMB_REMOTE_SERVER}${SMB_REMOTE_MOUNTPOINT}" "$SMB_MOUNT_POINT"
+
+        # Check if the mount command was successful
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to mount SMB share //${SMB_REMOTE_SERVER}${SMB_REMOTE_MOUNTPOINT} at $SMB_MOUNT_POINT" >&2
+            exit 1
+        fi
+        echo "SMB share mounted successfully at $SMB_MOUNT_POINT."
+    fi
+}
+
+# Function to unmount SMB share
+unmount_smb_share() {
+    echo "Unmounting SMB share at $SMB_MOUNT_POINT..."
+
+    # Check if the share is mounted before unmounting it
+    if mount | grep "$SMB_MOUNT_POINT" > /dev/null; then
+        umount "$SMB_MOUNT_POINT"
+        if [ $? -ne 0 ]; then
+            echo "Warning: Failed to unmount SMB share at $SMB_MOUNT_POINT" >&2
+        else
+            echo "SMB share unmounted successfully."
+        fi
+    else
+        echo "SMB share is not mounted at $SMB_MOUNT_POINT."
+    fi
 }
 
 # Check and create backup destination directories for the 1,2,3 principle if 123BACKUP is enabled
@@ -340,7 +464,15 @@ fi
 
 # Function to stop Docker based on the distribution
 stop_docker() {
-echo "Stopping Docker services..." | tee -a "$LOG_FILE"
+echo
+echo "##############################################################################################"
+echo "#                                                                                             "
+echo "#                                                                                             "
+echo "#                                   STOPPING DOCKER                                           "
+echo "#                                                                                             "
+echo "#                                                                                             "
+echo "##############################################################################################"
+echo
 case "$DISTRO" in
     ubuntu|debian)
         sudo systemctl stop docker.service
@@ -367,7 +499,15 @@ echo "Docker services stopped." | tee -a "$LOG_FILE"
 
 # Function to start Docker based on the distribution
 start_docker() {
-echo "Starting Docker services..." | tee -a "$LOG_FILE"
+echo
+echo "##############################################################################################"
+echo "#                                                                                             "
+echo "#                                                                                             "
+echo "#                                   STARTING DOCKER                                           "
+echo "#                                                                                             "
+echo "#                                                                                             "
+echo "##############################################################################################"
+echo
 case "$DISTRO" in
     ubuntu|debian)
         sudo systemctl start docker.service
@@ -396,6 +536,15 @@ echo "Docker services started." | tee -a "$LOG_FILE"
 check_docker_stopped() {
     local retries=5
     local wait_time=5
+    echo
+    echo "##############################################################################################"
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "#                                   CHECK IF DOCKER IS STOPPED                                "
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "##############################################################################################"
+    echo
     for ((i=1; i<=retries; i++)); do
         if ! systemctl is-active --quiet docker; then
             echo "Docker has stopped successfully." | tee -a "$LOG_FILE"
@@ -440,35 +589,40 @@ verify_backup() {
     local file="$1"
     local password="$2"
     TEST_START=$(date +%s)
-
+    echo
     echo "Begin backup verification for file: $file" | tee -a "$LOG_FILE"
 
     if [[ "$file" == *.enc ]]; then
         # Decrypt and then verify the backup
-        if openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -in "$file" -pass pass:"$password" | pigz -p $MAX_CPU_CORE -dc -9 | tar -tf - > /dev/null 2>&1; then
+        if openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -in "$file" -pass pass:"$password" | pigz -p $MAX_CPU_CORE -dc -9 | bar -s $(stat -c%s "$file") | tar -tf - > /dev/null 2>&1; then
             TEST_END=$(date +%s)
             TEST_STATUS="Successful"
+            echo
             echo "Verification successful for encrypted file: $file"
         else
             TEST_END=$(date +%s)
             TEST_STATUS="Failed"
+            echo
             echo "Verification failed for encrypted file: $file" >> "$LOG_FILE"
             echo "Verification failed for encrypted file: $file"
         fi
     else
         # Verify the backup using pigz for parallel decompression
-        if pigz -p $MAX_CPU_CORE -dc -9 "$file" | pv -s $(stat -c%s "$file") | tar -tf - > /dev/null 2>&1; then
+        if pigz -p $MAX_CPU_CORE -dc -9 "$file" | bar -s $(stat -c%s "$file") | tar -tf - > /dev/null 2>&1; then
             TEST_END=$(date +%s)
             TEST_STATUS="Successful"
+            echo
             echo "Verification successful for non-encrypted file: $file"
         else
             TEST_END=$(date +%s)
             TEST_STATUS="Failed"
+            echo
             echo "Verification failed for non-encrypted file: $file" >> "$LOG_FILE"
             echo "Verification failed for non-encrypted file: $file"
         fi
     fi
 
+    echo
     echo "Backup verification completed for file: $file" | tee -a "$LOG_FILE"
 
     # Calculate the test duration in minutes and seconds
@@ -496,8 +650,9 @@ compress_and_encrypt_backup() {
     local compressed_file="${backup_dir}/${base_file}.tar.gz"
 
     # Compress the backup file in every case
+    echo
     echo "Compressing the backup file $file..."
-    tar -P -cf - "$file" | pv -s $(du -sb "$file" | awk '{print $1}') | pigz -p $MAX_CPU_CORE -9 > "$compressed_file"
+    tar -P -cf - "$file" | bar -s $(du -sb "$file" | awk '{print $1}') | pigz -p $MAX_CPU_CORE -9 > "$compressed_file"
 
     if [ $? -ne 0 ]; then
         echo "Compression failed for $file" >> "$LOG_FILE"
@@ -509,6 +664,7 @@ compress_and_encrypt_backup() {
     # Calculate the MD5 before encrypting
     local md5_checksum=$(md5sum "$compressed_file" | awk '{ print $1 }')
     echo "MD5 checksum: $md5_checksum"
+    echo
     DATABASE_MD5_SUMS+=("$md5_checksum")
 
     if [ "$ENCRYPT_BACKUP" == "Y" ]; then
@@ -517,9 +673,11 @@ compress_and_encrypt_backup() {
 
         if [ $? -ne 0 ]; then
             echo "Encryption failed for $compressed_file" >> "$LOG_FILE"
+            echo
             return 1
         else
             echo "Encryption completed for $compressed_file" >> "$LOG_FILE"
+            echo
             rm -f "$compressed_file"  # Delete the file only after encryption is complete
         fi
 
@@ -611,19 +769,43 @@ backup_database() {
 
     case "$db_type" in
         "PostgreSQL"|"TimescaleDB")
-            echo "Performing the database backup $db_type..."
+            echo "##############################################################################################"
+            echo "#                                                                                             "
+            echo "#                      Performing the database backup $db_type...,                            "
+            echo "#                       MD5 checksum, Compressing and Verifivation                            "
+            echo "#                                of "$container_name"                                         "
+            echo "#                                                                                             "
+            echo "##############################################################################################"
             docker exec "$container_name" pg_dump -U "$db_user" "$db_name" > "$backup_file"
             ;;
         "MySQL"|"MariaDB")
-            echo "Performing the database backup MySQL/MariaDB..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" mysqldump -u "$db_user" -p"$db_password" "$db_name" > "$backup_file"
             ;;
         "MongoDB")
-            echo "Performing the database backup MongoDB..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" mongodump --db "$db_name" --out "$BACKUP_DATABASE_DIR/$db_name-$(date +%Y%m%d)"
             ;;
         "Redis")
-            echo "Performing the database backup Redis..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" redis-cli BGSAVE
             # Wait for the Redis backup to complete
             while ! docker exec "$container_name" redis-cli LASTSAVE > /dev/null; do
@@ -636,44 +818,96 @@ backup_database() {
             encrypted_file="$BACKUP_DATABASE_DIR/${container_name}_dump-$CURRENT_DATE"
             ;;
         "Cassandra")
-            echo "Performing the database backup Cassandra..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" nodetool snapshot -t "$(date +%Y%m%d)-snapshot"
             ;;
         "Elasticsearch")
-            echo "Performing the database backup Elasticsearch..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" elasticsearch-snapshot --repository backup-repo --snapshot "$(date +%Y%m%d)"
             ;;
         "SQLite")
-            echo "Performing the database backup SQLite..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker cp "$container_name:/path/to/database.sqlite" "$BACKUP_DATABASE_DIR/sqlite-backup-$(date +%Y%m%d).sqlite"
             ;;
         "Neo4j")
-            echo "Performing the database backup Neo4j..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" neo4j-admin backup --from="$container_name" --backup-dir="$BACKUP_DATABASE_DIR"
             ;;
         "CockroachDB")
-            echo "Performing the database backup CockroachDB..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" cockroach sql --execute="BACKUP TO '$BACKUP_DATABASE_DIR/backup'"
             ;;
         "InfluxDB")
-            echo "Performing the database backup InfluxDB..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" influx backup -portable "$BACKUP_DATABASE_DIR"
             ;;
         "Oracle")
-            echo "Performing the database backup Oracle..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" rman target / <<EOF
             backup database;
 EOF
             ;;
         "RethinkDB")
-            echo "Performing the database backup RethinkDB..."
+        echo "##############################################################################################"
+        echo "#                                                                                             "
+        echo "#                      Performing the database backup $db_type...,                            "
+        echo "#                       MD5 checksum, Compressing and Verifivation                            "
+        echo "#                                of "$container_name"                                         "
+        echo "#                                                                                             "
+        echo "##############################################################################################"
             docker exec "$container_name" rethinkdb dump -f "$BACKUP_DATABASE_DIR/rethinkdb-backup-$(date +%Y%m%d).tar.gz"
             ;;
         "Memcached")
+            echo
             echo "Memcached does not require a backup of persistent data. Ignoring…"
+            echo
             ;;
         *)
+            echo
             echo "Unsupported database type: $db_type"
+            echo
             return 1
             ;;
     esac
@@ -689,14 +923,18 @@ EOF
         DATABASE_BACKUP_FILES+=("${encrypted_file}.tar.gz.enc")
         # Verify  backup
         verify_backup "${encrypted_file}.tar.gz.enc" "$password"
+        echo
         echo "Verifying the Encrypted backup..."
+        echo
     else
         compress_and_encrypt_backup "$backup_file" "" ""
         DATABASE_PASSWORDS+=("No encryption")
         DATABASE_BACKUP_FILES+=("${backup_file}.tar.gz")
         # Verify  backup
         verify_backup "${backup_file}.tar.gz" ""
+        echo
         echo "Verifying the UnEncrypted backup..."
+        echo
     fi
 
     # Add the verification status to the DATABASE_TEST_STATUSES variable
@@ -721,6 +959,7 @@ EOF
     DATABASE_BACKUP_DETAILS+=("<tr><td>${db_name}</td><td>${container_name}</td><td>${BACKUP_DATABASE_DIR}</td><td>${original_db_size}</td></tr>")
 
     echo "Backup and compression completed for the database $db_name."
+    echo
 }
 
 # Function to perform the database restore
@@ -815,6 +1054,29 @@ calculate_total_source_size_readable() {
     du -sh "$dir" | awk '{print $1}'
 }
 
+# Function to convert the size to a readable scale (B, KiB, MiB, GiB, TiB)
+human_readable_size() {
+    local size=$1
+    local unit="B"
+    if (( $(echo "$size >= 1024" | bc -l) )); then
+        size=$(echo "scale=2; $size / 1024" | bc)
+        unit="KiB"
+    fi
+    if (( $(echo "$size >= 1024" | bc -l) )); then
+        size=$(echo "scale=2; $size / 1024" | bc)
+        unit="MiB"
+    fi
+    if (( $(echo "$size >= 1024" | bc -l) )); then
+        size=$(echo "scale=2; $size / 1024" | bc)
+        unit="GiB"
+    fi
+    if (( $(echo "$size >= 1024" | bc -l) )); then
+        size=$(echo "scale=2; $size / 1024" | bc)
+        unit="TiB"
+    fi
+    echo "$size $unit"
+}
+
 # Function to count the number of files in a directory
 count_files_in_directory() {
     local dir="$1"
@@ -830,7 +1092,13 @@ for DIR in "${SOURCE_DIRS[@]}"; do
     BACKUP_START=$(date +%s)
 
     # Write a log with the start timestamp
-    echo "Starting backup for $DIR_NAME at $(date)" | tee -a "$LOG_FILE"
+    echo "##############################################################################################"
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "#                              Starting backup for $DIR_NAME                                  "
+    echo "#                        Verification and compression in progress...                          "
+    echo "#                                                                                             "
+    echo "##############################################################################################"
 
     # Check if EXCLUDE_DIRS is empty
     EXCLUDE_OPTIONS=""
@@ -838,12 +1106,14 @@ for DIR in "${SOURCE_DIRS[@]}"; do
         EXCLUDE_OPTIONS=$(printf -- '--exclude=%s ' "${EXCLUDE_DIRS[@]}")
     fi
 
-    # Create the backup with 'pv' to show progress, excluding sockets
-    tar $EXCLUDE_OPTIONS --exclude='*.sock' -cf - "$DIR" -P | pv -s $(du -sb "$DIR" | awk '{print $1}') | pigz -9 > "$BACKUP_FILE" 2>> "$LOG_FILE"
-    BACKUP_END=$(date +%s)
+    # Create the backup with 'bar' to show progress, excluding sockets
+    tar $EXCLUDE_OPTIONS --exclude='*.sock' -cf - "$DIR" -P | bar -s $(du -sb "$DIR" | awk '{print $1}') | pigz -9 > "$BACKUP_FILE" 2>> "$LOG_FILE"
+
 
     # Write a log with the end timestamp
-    echo "Backup completed for $DIR_NAME at $(date)" | tee -a "$LOG_FILE"
+    BACKUP_END=$(date +%s)
+    echo "Backup completed for $DIR_NAME at $(convert_timestamp_to_date "$BACKUP_END")" | tee -a "$LOG_FILE"
+
 
     # Convert timestamps to a readable format
     BACKUP_START_READABLE=$(convert_timestamp_to_date "$BACKUP_START")
@@ -864,28 +1134,7 @@ for DIR in "${SOURCE_DIRS[@]}"; do
     # Calculate the original size of the directory in a human-readable format
     ORIGINAL_SIZE=$(calculate_total_source_size_readable "$DIR")
 
-    # Function to convert the size to a readable scale (B, KiB, MiB, GiB, TiB)
-    human_readable_size() {
-        local size=$1
-        local unit="B"
-        if (( $(echo "$size >= 1024" | bc -l) )); then
-            size=$(echo "scale=2; $size / 1024" | bc)
-            unit="KiB"
-        fi
-        if (( $(echo "$size >= 1024" | bc -l) )); then
-            size=$(echo "scale=2; $size / 1024" | bc)
-            unit="MiB"
-        fi
-        if (( $(echo "$size >= 1024" | bc -l) )); then
-            size=$(echo "scale=2; $size / 1024" | bc)
-            unit="GiB"
-        fi
-        if (( $(echo "$size >= 1024" | bc -l) )); then
-            size=$(echo "scale=2; $size / 1024" | bc)
-            unit="TiB"
-        fi
-        echo "$size $unit"
-    }
+
 
     # Calculate the backup size in a readable format
     BACKUP_SIZE=$(human_readable_size "$BACKUP_SIZE_BYTES")
@@ -899,7 +1148,9 @@ for DIR in "${SOURCE_DIRS[@]}"; do
         BACKUP_FILE=$(encrypt_backup "$BACKUP_FILE" "$PASSWORD")
         BACKUP_PASSWORDS+=("$PASSWORD")  # Store the password for this backup
     else
+        echo
         PASSWORD=""  # Ensure PASSWORD is empty if encryption is disabled
+        echo
         BACKUP_PASSWORDS+=("No encryption")  # No password if encryption is disabled
     fi
 
@@ -924,6 +1175,7 @@ for DIR in "${SOURCE_DIRS[@]}"; do
     ORIGINAL_SIZES+=("$ORIGINAL_SIZE")  # Store the original size for this backup
 done
 
+
 # Cleanup old backups based on the defined retention days
 for DIR in "${SOURCE_DIRS[@]}"; do
     find "$BACKUP_DIR" -type f -name "$(basename "$DIR")*.tar.gz" -mtime +$DAYS_TO_KEEP -exec rm -f {} \;
@@ -941,27 +1193,119 @@ count_existing_backups() {
     find "$dir" -type f -name "$pattern" | wc -l
 }
 
+calculate_available_space() {
+    local dir="$1"
+    df -h "$dir" | awk 'NR==2 {print $4}'
+}
+
+# Function to calculate available space in bytes
+calculate_available_space_bytes() {
+    local dir="$1"
+    df --output=avail -B1 "$dir" | awk 'NR==2 {print $1}'
+}
+
 # Function to copy backups to the 1,2,3 principle destinations
 copy_backups_to_destinations() {
     local backup_files=("$@")
     local total_size=0
+    local copy_start_time=$(date +%s)
 
     # Calculates the total size of all backup files.
     for file in "${backup_files[@]}"; do
         total_size=$((total_size + $(stat -c%s "$file")))
     done
 
-    # Copies all files to SATA_DISK1 using pv
+
+
+
+    # Copies all files to SATA_DISK1 using bar
+    available_space_before_1=$(calculate_available_space "$SATA_DISK1")
+    available_space_before_bytes_1=$(calculate_available_space_bytes "$SATA_DISK1")
+    local copy_start_time_1=$(date +%s)
+
+    echo
+    echo "##############################################################################################"
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "#                              Copying backups to $SATA_DISK1...                              "
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "##############################################################################################"
     echo "Copying backups to $SATA_DISK1..."
     for file in "${backup_files[@]}"; do
-        pv "$file" > "$SATA_DISK1/$(basename "$file")"
+            bar -s $(stat -c%s "$file") < "$file" > "$SATA_DISK1/$(basename "$file")"
+    done
+    local copy_end_time_1=$(date +%s)
+    available_space_after_1=$(calculate_available_space "$SATA_DISK1")
+    available_space_after_bytes_1=$(calculate_available_space_bytes "$SATA_DISK1")
+    TOTAL_COPY_TIME_1=$(calculate_total_copy_time "$copy_start_time_1" "$copy_end_time_1")
+    COPY_SPEED_1=$(calculate_copy_speed "$total_size" "$((copy_end_time_1 - copy_start_time_1))")
+    TOTAL_SIZE_1=$(human_readable_size "$total_size")
+
+    # Copies all files to SATA_DISK2 using bar
+    available_space_before_2=$(calculate_available_space "$SATA_DISK2")
+    available_space_before_bytes_2=$(calculate_available_space_bytes "$SATA_DISK2")
+    local copy_start_time_2=$(date +%s)
+
+    echo
+    echo "##############################################################################################"
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "#                              Copying backups to $SATA_DISK2...                              "
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "##############################################################################################"
+    for file in "${backup_files[@]}"; do
+            bar -s $(stat -c%s "$file") < "$file" > "$SATA_DISK2/$(basename "$file")"
+    done
+    local copy_end_time_2=$(date +%s)
+    available_space_after_2=$(calculate_available_space "$SATA_DISK2")
+    available_space_after_bytes_2=$(calculate_available_space_bytes "$SATA_DISK2")
+    TOTAL_COPY_TIME_2=$(calculate_total_copy_time "$copy_start_time_2" "$copy_end_time_2")
+    COPY_SPEED_2=$(calculate_copy_speed "$total_size" "$((copy_end_time_2 - copy_start_time_2))")
+    TOTAL_SIZE_2=$(human_readable_size "$total_size")
+
+
+# Copy backups using SCP
+if [ "$BACKUP_123" == "Y" ] && [ "$SCP_ENABLED" == "Y" ]; then
+    echo
+    echo "##############################################################################################"
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "#                              Copying backups via SCP...                                     "
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "##############################################################################################"
+    check_and_create_scp_directory  # Check and create SCP directory
+    for file in "${backup_files[@]}"; do
+        sshpass -p "$SCP_USER_PASSWORD" scp "$file" "$SCP_USER@$SCP_HOST:$SCP_DEST_DIR"
     done
 
-    # Copies all files to SATA_DISK2 using pv
-    echo "Copying backups to $SATA_DISK2..."
+fi
+
+# Copy backups using SMB
+if [ "$BACKUP_123" == "Y" ] && [ "$SMB_ENABLED" == "Y" ]; then
+    echo
+    echo "##############################################################################################"
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "#                              Copying backups to SMB share...                                "
+    echo "#                                                                                             "
+    echo "#                                                                                             "
+    echo "##############################################################################################"
+    mount_smb_share
+    check_and_create_smb_directory  # Check and create SMB directory
     for file in "${backup_files[@]}"; do
-        pv "$file" > "$SATA_DISK2/$(basename "$file")"
+        #cp "$file" "$SMB_MOUNT_POINT"
+        cp "$file" "$FULL_REMOTE_PATH"
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to copy $file to SMB share at $SMB_MOUNT_POINT" >&2
+            unmount_smb_share
+            exit 1
+        fi
     done
+    #unmount_smb_share
+fi
 }
 
 # Function to send a combined email for both directory and database backups
@@ -982,9 +1326,16 @@ send_email() {
         seconds=$(echo $duration | awk '{print $4}')
         TOTAL_BACKUP_TIME=$((TOTAL_BACKUP_TIME + minutes * 60 + seconds))
     done
-    AVERAGE_BACKUP_TIME=$((TOTAL_BACKUP_TIME / TOTAL_DIRECTORIES))
-    AVERAGE_BACKUP_MINUTES=$((AVERAGE_BACKUP_TIME / 60))
-    AVERAGE_BACKUP_SECONDS=$((AVERAGE_BACKUP_TIME % 60))
+
+    if [ "$TOTAL_DIRECTORIES" -ne 0 ]; then
+        AVERAGE_BACKUP_TIME=$((TOTAL_BACKUP_TIME / TOTAL_DIRECTORIES))
+        AVERAGE_BACKUP_MINUTES=$((AVERAGE_BACKUP_TIME / 60))
+        AVERAGE_BACKUP_SECONDS=$((AVERAGE_BACKUP_TIME % 60))
+    else
+        AVERAGE_BACKUP_TIME=0
+        AVERAGE_BACKUP_MINUTES=0
+        AVERAGE_BACKUP_SECONDS=0
+    fi
 
     # Check if backups are encrypted
     if [ "$ENCRYPT_BACKUP" == "Y" ]; then
@@ -1004,66 +1355,136 @@ send_email() {
     TOTAL_DATABASE_BACKUPS=$(count_existing_backups "$BACKUP_DATABASE_DIR" "*.tar.gz*")
 
 # Styles for email templates
-# Professional Light Theme
-STYLE_1="body { font-family: 'Courier New', Courier, monospace; background-color: #ffffff; color: #333333; }
-.container { max-width: 1200px; margin: 40px auto; background-color: #f9f9f9; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.3); color: #2c3e50; }
-h1 { font-size: 28px; color: #3498db; margin-bottom: 20px; } h2 { color: #2c3e50; margin-bottom: 15px; font-size: 22px; }
-ul { list-style-type: none; padding: 0; }
-li { padding: 8px; background-color: #ecf0f1;
-margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1); }
-pre { background-color: #3498db; color: #ffffff;
-padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-th, td { padding: 12px; border: 1px solid #e0e0e0; text-align: left; }
-th { background-color: #3498db; color: #ffffff; }
-td { background-color: #ecf0f1; color: #2c3e50; }
-footer { margin-top: 20px; font-size: 12px; color: #7f8c8d; text-align: center; }
-.stats-table { border-radius: 8px ; overflow: hidden; }
-.coffee-link { color: #2980b9; text-decoration: none; }
-.coffee-link:hover { text-decoration: underline; }
-.coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
-.separator { border-top: 3px solid #2980b9; margin: 20px 0; border-radius: 5px; }
-.centered-table th, .centered-table td { text-align: center; }
-body3 { background-color: #1d1d1f; font-family: Arial, sans-serif; color: #aab0c6; }
-.stats_backup { width: 300px auto; padding: 20px; background-color: #f9f9f9; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.3); text-align: center; color: #2c3e50; margin: auto; }
-.stats_info_backup { width: 700px auto; padding: 20px; background-color: #f9f9f9; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.3); text-align: left; color: #2c3e50; margin: auto; }
-.backup { font-size: 50px; margin-bottom: 15px; }
-.enc { font-size: 20px; font-weight: bold; }
-.size { font-size: 40px; color: #7f85ff; font-family: 'Courier New', Courier, monospace; }
-.status { font-size: 14px; }"
-
-STYLE_2="body { font-family: 'Courier New', Courier, monospace; background-color: #1b1b1b; color: #e0e0e0; }
+#
+# word-wrap: break-word; white-space: normal; overflow: hidden;
+#
+#
+# Dark Theme
+STYLE_1=" body { font-family: 'Courier New', Courier, monospace; background-color: #1b1b1b; color: #e0e0e0; }
 .container { max-width: 1200px; margin: 40px auto; background-color: #2b2b2b; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); color: #e0e0e0; }
-h1 { font-size: 28px; color: #77c0e3; margin-bottom: 20px; }
-h2 { color: #e0e0e0; margin-bottom: 15px; font-size: 22px; }
-ul { list-style-type: none; padding: 0; }
-li { padding: 8px; background-color: #444444; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); }
-pre { background-color: #77c0e3; color: #1b1b1b; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-th, td { padding: 12px; border: 1px solid #444444; text-align: left; }
-th { background-color: #77c0e3; color: #1b1b1b; }
-td { background-color: #444444; color: #e0e0e0; }
-footer { margin-top: 20px; font-size: 12px; color: #b0b0b0; text-align: center; }
-.stats-table { border-radius: 8px ; overflow: hidden; }
-.coffee-link { color: #77c0e3; text-decoration: none; }
-.coffee-link:hover { text-decoration: underline; }
-.coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
-.separator { border-top: 3px solid #77c0e3; margin: 20px 0; border-radius: 5px; }
-.centered-table th, .centered-table td { text-align: center; }
-body3 { background-color: #121212; font-family: Arial, sans-serif; color: #aab0c6; }
-.stats_backup { width: 300px auto; padding: 20px; background-color: #2b2b2b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #e0e0e0; margin: auto; }
-.stats_info_backup { width: 700px auto; padding: 20px; background-color: #2b2b2b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #e0e0e0; margin: auto; }
-.backup { font-size: 50px; margin-bottom: 15px; }
-.enc { font-size: 20px; font-weight: bold; }
-.size { font-size: 40px; color: #7f85ff; font-family: 'Courier New', Courier, monospace; }
-.status { font-size: 14px; }"
+h1 { font-size: 28px; color: #77c0e3; margin-bottom: 20px; } h2 { color: #e0e0e0; margin-bottom: 15px; font-size: 22px; } ul { list-style-type: none; padding: 0; }
+li { padding: 8px; background-color: #444444; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); } pre { background-color: #77c0e3; color: #1b1b1b; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #444444; text-align: left; } th { background-color: #77c0e3; color: #1b1b1b; } td { background-color: #444444; color: #e0e0e0; }
+footer { margin-top: 20px; font-size: 12px; color: #b0b0b0; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden;} .stats-table { border-radius: 8px ; overflow: hidden; border-radius: 8px }
+.coffee-link { color: #77c0e3; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; } .separator { border-top: 3px solid #77c0e3; margin: 20px 0; border-radius: 5px; }
+.centered-table th, .centered-table td { text-align: center; } body3 { background-color: #121212; font-family: Arial, sans-serif; color: #aab0c6; } .stats_backup { width: 300px auto; height: 250px ; padding: 20px; background-color: #2b2b2b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #e0e0e0; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 250px ; padding: 20px; background-color: #2b2b2b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #e0e0e0; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #7f85ff; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
+
+# Crimson Night
+STYLE_2="body { font-family: 'Courier New', Courier, monospace; background-color: #2b0a14; color: #f4c7c3; }
+.container { max-width: 1200px; margin: 40px auto; background-color: #400b1d; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); color: #f4c7c3; }
+h1 { font-size: 28px; color: #ff557f; margin-bottom: 20px; } h2 { color: #f4c7c3; margin-bottom: 15px; font-size: 22px; } ul { list-style-type: none; padding: 0; } li { padding: 8px; background-color: #660f2c; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); }
+pre { background-color: #ff557f; color: #2b0a14; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #660f2c; text-align: left; }
+th { background-color: #ff557f; color: #2b0a14; } td { background-color: #660f2c; color: #f4c7c3; } footer { margin-top: 20px; font-size: 12px; color: #b0b0b0; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden; }
+.stats-table { border-radius: 8px; overflow: hidden; } .coffee-link { color: #ff557f; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
+.separator { border-top: 3px solid #ff557f; margin: 20px 0; border-radius: 5px; } .centered-table th, .centered-table td { text-align: center; } body3 { background-color: #400b1d; font-family: Arial, sans-serif; color: #f4c7c3; }
+.stats_backup { width: 300px auto; height: 210px; padding: 20px; background-color: #400b1d; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #f4c7c3; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 210px; padding: 20px; background-color: #400b1d; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #f4c7c3; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #ff557f; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
+
+# Cyberpunk
+STYLE_3="body { font-family: 'Courier New', Courier, monospace; background-color: #1b1b1b; color: #ff0077; } .container { max-width: 1200px; margin: 40px auto; background-color: #2b2b2b; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); color: #ff0077; }
+h1 { font-size: 28px; color: #ffcc00; margin-bottom: 20px; } h2 { color: #ff0077; margin-bottom: 15px; font-size: 22px; } ul { list-style-type: none; padding: 0; }
+li { padding: 8px; background-color: #333333; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); } pre { background-color: #ffcc00; color: #1b1b1b; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #333333; text-align: left; } th { background-color: #ffcc00; color: #1b1b1b; } td { background-color: #333333; color: #ff0077; }
+footer { margin-top: 20px; font-size: 12px; color: #ff99cc; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden;} .stats-table { border-radius: 8px; overflow: hidden; }
+.coffee-link { color: #ffcc00; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; } .separator { border-top: 3px solid #ffcc00; margin: 20px 0; border-radius: 5px; }
+.centered-table th, .centered-table td { text-align: center; } body3 { background-color: #121212; font-family: Arial, sans-serif; color: #ff0077; } .stats_backup { width: 300px auto; height: 210px; padding: 20px; background-color: #2b2b2b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #ff0077; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 210px; padding: 20px; background-color: #2b2b2b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #ff0077; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #ffcc00; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
+
+# Steel Gray
+STYLE_4="body { font-family: 'Courier New', Courier, monospace; background-color: #1a1a1a; color: #e0e0e0; } .container { max-width: 1200px; margin: 40px auto; background-color: #333333; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); color: #e0e0e0; }
+h1 { font-size: 28px; color: #a0a0a0; margin-bottom: 20px; } h2 { color: #e0e0e0; margin-bottom: 15px; font-size: 22px; } ul { list-style-type: none; padding: 0; } li { padding: 8px; background-color: #444444; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); }
+pre { background-color: #a0a0a0; color: #1a1a1a; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #444444; text-align: left; }
+th { background-color: #a0a0a0; color: #1a1a1a; } td { background-color: #444444; color: #e0e0e0; } footer { margin-top: 20px; font-size: 12px; color: #b0b0b0; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden; }
+.stats-table { border-radius: 8px; overflow: hidden; } .coffee-link { color: #a0a0a0; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
+.separator { border-top: 3px solid #a0a0a0; margin: 20px 0; border-radius: 5px; } .centered-table th, .centered-table td { text-align: center; } body3 { background-color: #333333; font-family: Arial, sans-serif; color: #e0e0e0; }
+.stats_backup { width: 300px auto; height: 210px; padding: 20px; background-color: #333333; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #e0e0e0; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 210px; padding: 20px; background-color: #333333; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #e0e0e0; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #a0a0a0; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
+
+# Emerald Glow
+STYLE_5="body { font-family: 'Courier New', Courier, monospace; background-color: #0a2e1f; color: #c4f4e1; } .container { max-width: 1200px; margin: 40px auto; background-color: #144f3b; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); color: #c4f4e1; }
+h1 { font-size: 28px; color: #3ce896; margin-bottom: 20px; } h2 { color: #c4f4e1; margin-bottom: 15px; font-size: 22px; } ul { list-style-type: none; padding: 0; } li { padding: 8px; background-color: #236f55; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); }
+pre { background-color: #3ce896; color: #0a2e1f; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #236f55; text-align: left; }
+th { background-color: #3ce896; color: #0a2e1f; } td { background-color: #236f55; color: #c4f4e1; } footer { margin-top: 20px; font-size: 12px; color: #b0b0b0; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden; }
+.stats-table { border-radius: 8px; overflow: hidden; } .coffee-link { color: #3ce896; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
+.separator { border-top: 3px solid #3ce896; margin: 20px 0; border-radius: 5px; } .centered-table th, .centered-table td { text-align: center; } body3 { background-color: #144f3b; font-family: Arial, sans-serif; color: #c4f4e1; }
+.stats_backup { width: 300px auto; height: 210px; padding: 20px; background-color: #144f3b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #c4f4e1; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 210px; padding: 20px; background-color: #144f3b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #c4f4e1; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #3ce896; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
+
+#Home Lab Tech
+STYLE_6="body { font-family: 'Courier New', Courier, monospace; background-color: #1d1f21; color: #c5c8c6; } .container { max-width: 1200px; margin: 40px auto; background-color: #282a2e; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); color: #c5c8c6; }
+h1 { font-size: 28px; color: #81a2be; margin-bottom: 20px; } h2 { color: #c5c8c6; margin-bottom: 15px; font-size: 22px; } ul { list-style-type: none; padding: 0; } li { padding: 8px; background-color: #373b41; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); }
+pre { background-color: #81a2be; color: #1d1f21; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #373b41; text-align: left; }
+th { background-color: #81a2be; color: #1d1f21; } td { background-color: #373b41; color: #c5c8c6; } footer { margin-top: 20px; font-size: 12px; color: #707880; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden;}
+.stats-table { border-radius: 8px; overflow: hidden; } .coffee-link { color: #81a2be; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
+.separator { border-top: 3px solid #81a2be; margin: 20px 0; border-radius: 5px; } .centered-table th, .centered-table td { text-align: center; } body3 { background-color: #121212; font-family: Arial, sans-serif; color: #c5c8c6; }
+.stats_backup { width: 300px auto; height: 210px; padding: 20px; background-color: #282a2e; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #c5c8c6; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 210px; padding: 20px; background-color: #282a2e; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #c5c8c6; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #81a2be; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
+
+# Light
+STYLE_7="body { font-family: 'Courier New', Courier, monospace; background-color: #f9f9f9; color: #333333; } .container { max-width: 1200px; margin: 40px auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1); color: #333333; }
+h1 { font-size: 28px; color: #007acc; margin-bottom: 20px; } h2 { color: #333333; margin-bottom: 15px; font-size: 22px; } ul { list-style-type: none; padding: 0; } li { padding: 8px; background-color: #dddddd; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1); }
+pre { background-color: #007acc; color: #ffffff; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #dddddd; text-align: left; }
+th { background-color: #007acc; color: #ffffff; } td { background-color: #f0f0f0; color: #333333; } footer { margin-top: 20px; font-size: 12px; color: #777777; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden;}
+.stats-table { border-radius: 8px; overflow: hidden; } .coffee-link { color: #007acc; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
+.separator { border-top: 3px solid #007acc; margin: 20px 0; border-radius: 5px; } .centered-table th, .centered-table td { text-align: center; } body3 { background-color: #e0e0e0; font-family: Arial, sans-serif; color: #333333; }
+.stats_backup { width: 300px auto; height: 210px; padding: 20px; background-color: #ffffff; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1); text-align: center; color: #333333; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 210px; padding: 20px; background-color: #ffffff; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1); text-align: left; color: #333333; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #007acc; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
+
+# Midnight Blue
+STYLE_8="body { font-family: 'Courier New', Courier, monospace; background-color: #0a1f44; color: #d6e3f8; } .container { max-width: 1200px; margin: 40px auto; background-color: #122d5e; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); color: #d6e3f8; }
+h1 { font-size: 28px; color: #55b3f3; margin-bottom: 20px; } h2 { color: #d6e3f8; margin-bottom: 15px; font-size: 22px; } ul { list-style-type: none; padding: 0; } li { padding: 8px; background-color: #1e3d6e; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); }
+pre { background-color: #55b3f3; color: #0a1f44; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #1e3d6e; text-align: left; }
+th { background-color: #55b3f3; color: #0a1f44; } td { background-color: #1e3d6e; color: #d6e3f8; } footer { margin-top: 20px; font-size: 12px; color: #b0b0b0; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden; }
+.stats-table { border-radius: 8px; overflow: hidden; } .coffee-link { color: #55b3f3; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
+.separator { border-top: 3px solid #55b3f3; margin: 20px 0; border-radius: 5px; } .centered-table th, .centered-table td { text-align: center; } body3 { background-color: #122d5e; font-family: Arial, sans-serif; color: #d6e3f8; }
+.stats_backup { width: 300px auto; height: 210px; padding: 20px; background-color: #122d5e; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #d6e3f8; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 210px; padding: 20px; background-color: #122d5e; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #d6e3f8; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #55b3f3; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
+
+# Purple Dusk
+STYLE_9="body { font-family: 'Courier New', Courier, monospace; background-color: #21024b; color: #e1d0f4; } .container { max-width: 1200px; margin: 40px auto; background-color: #3b0a6b; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); color: #e1d0f4; }
+h1 { font-size: 28px; color: #bb77ff; margin-bottom: 20px; } h2 { color: #e1d0f4; margin-bottom: 15px; font-size: 22px; } ul { list-style-type: none; padding: 0; } li { padding: 8px; background-color: #5e198e; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); }
+pre { background-color: #bb77ff; color: #21024b; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #5e198e; text-align: left; }
+th { background-color: #bb77ff; color: #21024b; } td { background-color: #5e198e; color: #e1d0f4; } footer { margin-top: 20px; font-size: 12px; color: #b0b0b0; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden; }
+.stats-table { border-radius: 8px; overflow: hidden; } .coffee-link { color: #bb77ff; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
+.separator { border-top: 3px solid #bb77ff; margin: 20px 0; border-radius: 5px; } .centered-table th, .centered-table td { text-align: center; } body3 { background-color: #3b0a6b; font-family: Arial, sans-serif; color: #e1d0f4; }
+.stats_backup { width: 300px auto; height: 210px; padding: 20px; background-color: #3b0a6b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #e1d0f4; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 210px; padding: 20px; background-color: #3b0a6b; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #e1d0f4; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #bb77ff; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
+
+# Retro Neon
+STYLE_10="body { font-family: 'Courier New', Courier, monospace; background-color: #1a1a2e; color: #f5f5f5; } .container { max-width: 1200px; margin: 40px auto; background-color: #16213e; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); color: #f5f5f5; }
+h1 { font-size: 28px; color: #ff007f; margin-bottom: 20px; } h2 { color: #f5f5f5; margin-bottom: 15px; font-size: 22px; }  ul { list-style-type: none; padding: 0; } li { padding: 8px; background-color: #0f3460; margin-bottom: 8px; border-radius: 4px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5); }
+pre { background-color: #ff007f; color: #f5f5f5; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; } th, td { padding: 12px; border: 1px solid #0f3460; text-align: left; }
+th { background-color: #ff007f; color: #f5f5f5; } td { background-color: #0f3460; color: #f5f5f5; } footer { margin-top: 20px; font-size: 12px; color: #888888; text-align: center; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden;}
+.stats-table { border-radius: 8px; overflow: hidden; } .coffee-link { color: #ff007f; text-decoration: none; } .coffee-link:hover { text-decoration: underline; } .coffee-logo { width: 20px; vertical-align: middle; margin-right: 5px; }
+.separator { border-top: 3px solid #ff007f; margin: 20px 0; border-radius: 5px; } .centered-table th, .centered-table td { text-align: center; } body3 { background-color: #16213e; font-family: Arial, sans-serif; color: #f5f5f5; }
+.stats_backup { width: 300px auto; height: 210px; padding: 20px; background-color: #16213e; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: center; color: #f5f5f5; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.stats_info_backup { width: 700px auto; height: 210px; padding: 20px; background-color: #16213e; border-radius: 8px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.8); text-align: left; color: #f5f5f5; margin: auto; word-wrap: break-word; white-space: normal; overflow: hidden;}
+.backup { font-size: 50px; margin-bottom: 15px; } .enc { font-size: 20px; font-weight: bold; } .size { font-size: 40px; color: #ff007f; font-family: 'Courier New', Courier, monospace; } .status { font-size: 14px; }"
 
 # Select the style based on MAIL_TEMPLATE
 case "$MAIL_TEMPLATE" in
     1) SELECTED_STYLE="$STYLE_1" ;;
     2) SELECTED_STYLE="$STYLE_2" ;;
+    3) SELECTED_STYLE="$STYLE_3" ;;
+    4) SELECTED_STYLE="$STYLE_4" ;;
+    5) SELECTED_STYLE="$STYLE_5" ;;
+    6) SELECTED_STYLE="$STYLE_6" ;;
+    7) SELECTED_STYLE="$STYLE_7" ;;
+    8) SELECTED_STYLE="$STYLE_8" ;;
+    9) SELECTED_STYLE="$STYLE_9" ;;
+    10) SELECTED_STYLE="$STYLE_10" ;;
     random|*)
-        RANDOM_INDEX=$((RANDOM % 2 + 1))
+        RANDOM_INDEX=$((RANDOM % 10 + 1))
         SELECTED_STYLE=$(eval echo "\$STYLE_$RANDOM_INDEX")
         ;;
 esac
@@ -1322,7 +1743,9 @@ EOF"
                         <div class="stats_backup">
                         <div class="backup">${db_name}</div>
                         <div class="size">$backup_size</div>
-                        <div class="enc">Encrypted: $ENCRYPTION_STATUS</div>
+
+                        <div class="enc"><br>Encrypted: $ENCRYPTION_STATUS</div>
+
                         <div class="status">$test_status</div>
                         </div>
                     </td>
@@ -1438,21 +1861,46 @@ MESSAGE+="
 
             if [ "$BACKUP_123" == "Y" ]; then
                 MESSAGE+="
+
                 <h2><center>123 BACKUP:</center></h2>
-                    <table class='stats-table centered-table'>
-                        <thead>
-                            <tr>
-                                <th>First disk copy</th>
-                                    <th>Second disk copy</th>
+                                        <table>
+                                        <tr>
+                                        <td>
+                    <h3>First disk copy,<br> path: "$SATA_DISK1"</h3>
+                    <ul>
+                        <li>Total Size: $TOTAL_SIZE_1</li>
+                        <li>Total Time copy: $TOTAL_COPY_TIME_1</li>
+                        <li>Speed copy: $COPY_SPEED_1</li>
+                        <li>Available space before copy: $available_space_before_1</li>
+                        <li>Available space after copy: $available_space_after_1</li>
+                    </ul>
+                                        </td>
+                                        <td>
+                    <h3>Second disk copy,<br> path: "$SATA_DISK2"</h3>
+                    <ul>
+                        <li>Total Size: $TOTAL_SIZE_2</li>
+                        <li>Total Time copy: $TOTAL_COPY_TIME_2</li>
+                        <li>Speed copy: $COPY_SPEED_2</li>
+                        <li>Available space before copy: $available_space_before_2</li>
+                        <li>Available space after copy: $available_space_after_2</li>
+                                        </td>
                                         </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>$SATA_DISK1</td>
-                                <td>$SATA_DISK2</td>
-                                </tr>
-                        </tbody>
-                    </table>"
+                                        </table>
+                    </ul>"
+            fi
+
+            if [ "$BACKUP_123" == "Y" ] && [ "$SCP_ENABLED" == "Y" ]; then
+                MESSAGE+="<h2><center>SCP Backup:</center></h2>
+                <ul>
+                    <li><center>Destination: $SCP_USER@$SCP_HOST:$SCP_DEST_DIR</center></li>
+                </ul>"
+            fi
+
+            if [ "$BACKUP_123" == "Y" ] && [ "$SMB_ENABLED" == "Y" ]; then
+                MESSAGE+="<h2><center>SMB Backup:</center></h2>
+                <ul>
+                    <li><center>Remote Share: ${SMB_REMOTE_SERVER}${SMB_REMOTE_MOUNTPOINT}${SMB_REMOTE_BACKUP} | Local Mount Point: ${SMB_MOUNT_POINT}</center></li>
+                </ul>"
             fi
 
             MESSAGE+="
@@ -1469,7 +1917,6 @@ MESSAGE+="
     msmtp --host="$SMTP_HOST" --port="$SMTP_PORT" --auth=on --user="$SMTP_USER" --passwordeval="echo $SMTP_PASSWORD" \
           --tls=on --tls-starttls=on --from="$SMTP_FROM" "$EMAIL_RECIPIENT"
 }
-
 
 # Function to calculate the total size of a directory in bytes
 calculate_total_size() {
@@ -1536,9 +1983,58 @@ for DIR in "${SOURCE_DIRS[@]}"; do
     find "$BACKUP_DIR" -type f -name "$(basename "$DIR")*.tar.gz" -mtime +$DAYS_TO_KEEP -exec rm -f {} \;
 done
 
+# Function to calculate the total size of a directory in bytes
+calculate_total_size() {
+    local dir="$1"
+    du -sb "$dir" | awk '{print $1}'
+}
+
+# Function to calculate the total size of backup files in a directory
+calculate_total_backup_size() {
+    local dir="$1"
+    find "$dir" -type f -name "*.tar.gz*" -exec stat -c%s {} + | awk '{s+=$1} END {print s}'
+}
+
+# Function to calculate the total time taken for copying backups
+calculate_total_copy_time() {
+    local start_time=$1
+    local end_time=$2
+    local duration=$(( end_time - start_time ))
+
+    # Calculate minutes and seconds
+    local minutes=$(( duration / 60 ))
+    local seconds=$(( duration % 60 ))
+
+    echo "${minutes} minutes and ${seconds} seconds"
+}
+
+# Function to calculate the average speed of copying backups
+calculate_copy_speed() {
+    local total_size=$1
+    local total_time=$2
+
+    # Avoid division by zero
+    if [[ $total_time -eq 0 ]]; then
+        total_time=1
+    fi
+
+    # Calculate speed in MB/s (bytes / seconds -> MB/s)
+    local speed=$(echo "scale=2; $total_size / $total_time / 1024 / 1024" | bc -l)
+    echo "$speed MB/s"
+}
+
 # Send the final email with all the backup files and database reports
 if [ "$BACKUP_123" == "Y" ]; then
     copy_backups_to_destinations "${BACKUP_FILES[@]}" "${DATABASE_BACKUP_FILES[@]}"
 fi
 send_email
+
+echo
+echo "##############################################################################################"
+echo "#                                                                                             "
+echo "#                                                                                             "
+echo "#                          ALL COMPLETED HERE, AND MAIL SENT!!                                "
+echo "#                                                                                             "
+echo "#                                                                                             "
+echo "##############################################################################################"
 # END! :)
