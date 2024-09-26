@@ -59,49 +59,6 @@ This script automates the process of backing up multiple directories and databas
 
 
 
-
-## Theme Comparison: Dark vs Light
-
-<div style="text-align: center;">
-  <table>
-    <tr>
-      <td align="center"><strong>Dark Theme</strong></td>
-      <td align="center"><strong>Light Theme</strong></td>
-    </tr>
-    <tr>
-      <td align="center">
-        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Samlple%20Dark%20Theme%20-%20small%20-%20Directory.png" alt="Samlple Dark Theme - small - Directory" width="300"/>
-        <br>Directory
-      </td>
-      <td align="center">
-        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Sample%20Light%20Theme%20-%20small%20-%20Directory.png" alt="Sample Light Theme - Directory" width="300"/>
-        <br>Directory
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Samlple%20Dark%20Theme%20-%20small%20-%20Database.png" alt="Samlple Dark Theme - small - Database" width="300"/>
-        <br>Database
-      </td>
-      <td align="center">
-        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Sample%20Light%20Theme%20-%20small%20-%20Database.png" alt="Sample Light Theme - Database" width="300"/>
-        <br>Database
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Samlple%20Dark%20Theme%20-%20small%20-%20Statistics.png" alt="Samlple Dark Theme - small - Statistics" width="300"/>
-        <br>Statistics
-      </td>
-      <td align="center">
-        <img src="https://github.com/DartSteven/Linux-Backup-Script/raw/main/Sample%20Template%20Preview/Sample%20Light%20Theme%20-%20small%20-%20Statistics.png" alt="Sample Light Theme - Statistics" width="300"/>
-        <br>Statistics
-      </td>
-    </tr>
-  </table>
-</div>
-
-
 ## Prerequisites
 
 Before running the script, ensure that the following packages are installed on your Linux system:
