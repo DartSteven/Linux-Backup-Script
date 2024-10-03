@@ -202,6 +202,13 @@ SMB_MOUNT_POINT=""
 
 
 
+
+
+
+
+
+
+
 #####################################################################################################################################
 #       DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE       #
 #       DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE       #
@@ -209,9 +216,6 @@ SMB_MOUNT_POINT=""
 #       DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE       #
 #       DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE - DO NOT EDIT BELOW THIS LINE       #
 #####################################################################################################################################
-
-
-
 
 
 # Check if the script is being run as root
@@ -1515,6 +1519,8 @@ esac
     </head>
     <body>
        <div class='container'>
+            <center><h1>$BACKUP_NAME</h1>
+            <h1></h1>
             <center><h1>Backup successfully completed</h1>
             <p>Server: $SERVER_NAME - Used $MAX_CPU_CORE cores for compression and decompression</p>
             <p>Backup performed on $(date +'%d %b %Y, %H:%M:%S')</p></center>
@@ -2023,10 +2029,21 @@ calculate_copy_speed() {
     echo "$speed MB/s"
 }
 
+# Function to check for an active internet connection
+check_internet_connection() {
+    while ! ping -c 1 8.8.8.8 &>/dev/null; do
+        echo "No internet connection detected. Retrying in 5 minutes..."
+        sleep 60  # Retry every 1 minute
+    done
+    echo "Internet connection restored. Proceeding to send the backup report email."
+}
+
 # Send the final email with all the backup files and database reports
 if [ "$BACKUP_123" == "Y" ]; then
     copy_backups_to_destinations "${BACKUP_FILES[@]}" "${DATABASE_BACKUP_FILES[@]}"
 fi
+
+check_internet_connection
 send_email
 
 echo
