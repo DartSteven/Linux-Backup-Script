@@ -153,6 +153,10 @@ To configure the script to send email notifications using iCloud's SMTP server:
 
 ## Changelog
 
+### [2.1] - 2024-10-28
+#### Fixed
+- Cleanup old backups keeping only the most recent ones based on DAYS_TO_KEEP
+
 ### [2.1] - 2024-09-26
 #### Added
 
