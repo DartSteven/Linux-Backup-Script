@@ -252,7 +252,7 @@ check_and_install_dependencies() {
     fi
 
     # Required packages
-    REQUIRED_PACKAGES="tar bar pigz openssl msmtp coreutils cifs-utils openssh-client sshpass smbclient"
+    REQUIRED_PACKAGES="tar bc bar pigz openssl msmtp coreutils cifs-utils openssh-client sshpass smbclient"
 
     case "$DISTRO" in
         ubuntu|debian)
@@ -1180,10 +1180,88 @@ for DIR in "${SOURCE_DIRS[@]}"; do
 done
 
 
-# Cleanup old backups based on the defined retention days
-for DIR in "${SOURCE_DIRS[@]}"; do
-    find "$BACKUP_DIR" -type f -name "$(basename "$DIR")*.tar.gz" -mtime +$DAYS_TO_KEEP -exec rm -f {} \;
-done
+# Cleanup old backups keeping only the most recent ones based on DAYS_TO_KEEP
+cleanup_old_backups() {
+    local backup_dir="$1"
+    local is_123_backup="$2"  # nuovo parametro per identificare se è un backup 123
+
+    echo "Starting cleanup in directory: $backup_dir"
+
+    if [ "$is_123_backup" == "Y" ]; then
+        # Per i backup 123, gestisci tutti i file nella stessa directory
+        if [ "$ENCRYPT_BACKUP" == "Y" ]; then
+            find "$backup_dir" -type f -name "*.tar.gz.enc" | sort -r | awk -v keep="$DAYS_TO_KEEP" '
+            NR > keep {
+                print "Removing backup: " $0
+                system("rm -f " $0)
+            }'
+        else
+            find "$backup_dir" -type f -name "*.tar.gz" | sort -r | awk -v keep="$DAYS_TO_KEEP" '
+            NR > keep {
+                print "Removing backup: " $0
+                system("rm -f " $0)
+            }'
+        fi
+    else
+        # Per il backup principale, gestisci separatamente i backup delle directory
+        for DIR in "${SOURCE_DIRS[@]}"; do
+            base_dir=$(basename "$DIR")
+            echo "Cleaning up old backups for directory: $base_dir"
+            if [ "$ENCRYPT_BACKUP" == "Y" ]; then
+                find "$backup_dir" -type f -name "*-${base_dir}.tar.gz.enc" | sort -r | awk -v keep="$DAYS_TO_KEEP" '
+                NR > keep {
+                    print "Removing backup: " $0
+                    system("rm -f " $0)
+                }'
+            else
+                find "$backup_dir" -type f -name "*-${base_dir}.tar.gz" | sort -r | awk -v keep="$DAYS_TO_KEEP" '
+                NR > keep {
+                    print "Removing backup: " $0
+                    system("rm -f " $0)
+                }'
+            fi
+        done
+
+        # Per il backup principale, gestisci separatamente i backup dei database
+        if [ "$BACKUP_DOCKER_DATABASE" == "Y" ]; then
+            for DB in "${DATABASES[@]}"; do
+                db_type=$(echo $DB | cut -d'|' -f1)
+                container_name=$(echo $DB | cut -d'|' -f2)
+                db_name=$(echo $DB | cut -d'|' -f3)
+
+                # Skip if database name is empty (like in Redis case)
+                if [ -z "$db_name" ]; then
+                    db_name="dump"
+                fi
+
+                echo "Cleaning up old backups for database: $db_name"
+                if [ "$ENCRYPT_BACKUP" == "Y" ]; then
+                    find "$backup_dir" -type f -name "${db_name}-*.tar.gz.enc" | sort -r | awk -v keep="$DAYS_TO_KEEP" '
+                    NR > keep {
+                        print "Removing backup: " $0
+                        system("rm -f " $0)
+                    }'
+                else
+                    find "$backup_dir" -type f -name "${db_name}-*.tar.gz" | sort -r | awk -v keep="$DAYS_TO_KEEP" '
+                    NR > keep {
+                        print "Removing backup: " $0
+                        system("rm -f " $0)
+                    }'
+                fi
+            done
+        fi
+    fi
+}
+
+# Clean up main backup directories (sources and databases separately)
+cleanup_old_backups "$BACKUP_DIR" "N"
+cleanup_old_backups "$BACKUP_DATABASE_DIR" "N"
+
+# If 123 backup is enabled, clean up those locations
+if [ "$BACKUP_123" == "Y" ]; then
+    cleanup_old_backups "$SATA_DISK1" "Y"
+    cleanup_old_backups "$SATA_DISK2" "Y"
+fi
 
 # Restart Docker if necessary
 if [ "$STOP_DOCKER_BEFORE_BACKUP" == "Y" ]; then
